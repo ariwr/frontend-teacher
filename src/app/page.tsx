@@ -69,10 +69,12 @@ export default function Home() {
             <span className="font-semibold text-godding-text-primary">세특 작성부터 과목 수요 조사까지</span> 모든 것을 한 곳에서
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="text-lg px-8 py-4">
-              <SparklesIcon className="w-5 h-5 mr-2" />
-              시작하기
-            </Button>
+            <Link href="/login">
+              <Button size="lg" className="text-lg px-8 py-4">
+                <SparklesIcon className="w-5 h-5 mr-2" />
+                로그인하기
+              </Button>
+            </Link>
             <Button variant="outline" size="lg" className="text-lg px-8 py-4">
               더 알아보기
             </Button>
@@ -126,9 +128,11 @@ export default function Home() {
             <p className="text-xl text-godding-text-secondary mb-10 max-w-2xl mx-auto">
               고교학점제 시대, 교사들의 든든한 파트너가 되어드립니다
             </p>
-            <Button size="lg" className="text-lg px-10 py-4">
-              무료로 시작하기
-            </Button>
+            <Link href="/login">
+              <Button size="lg" className="text-lg px-10 py-4">
+                무료로 시작하기
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

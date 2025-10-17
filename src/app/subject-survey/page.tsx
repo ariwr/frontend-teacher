@@ -6,287 +6,328 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { 
-  ChartBarIcon, 
+  SignalIcon, 
   PlusIcon,
   TrashIcon,
   EyeIcon,
   UserGroupIcon,
   BuildingOfficeIcon,
-  BookOpenIcon,
-  CalendarDaysIcon,
+  MapPinIcon,
+  ClockIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
   PencilIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  DocumentArrowDownIcon,
+  WifiIcon,
+  Battery0Icon,
+  DevicePhoneMobileIcon,
+  BellIcon
 } from "@heroicons/react/24/outline"
 
-interface Subject {
+interface Beacon {
   id: string
+  uuid: string
+  major: number
+  minor: number
   name: string
-  category: string
-  grade: string
-  credits: number
-  maxStudents: number
-  description: string
+  location: string
+  spaceId: string
+  batteryLevel: number
+  lastSignalTime: string
+  status: 'active' | 'low_battery' | 'offline' | 'maintenance'
+  signalStrength: number
+  installDate: string
 }
 
-interface Teacher {
+interface Space {
   id: string
   name: string
-  subjects: string[]
-  maxHours: number
-  currentHours: number
-}
-
-interface Classroom {
-  id: string
-  name: string
+  type: '정독실' | '도서관' | '컴퓨터실' | '실험실' | '강의실' | '휴게실'
   capacity: number
-  type: '일반' | '특별실' | '실험실'
-  equipment: string[]
+  currentOccupancy: number
+  beaconId?: string
+  description: string
+  operatingHours: {
+    start: string
+    end: string
+  }
+  rules: string[]
 }
 
-interface Survey {
+interface Student {
   id: string
-  title: string
-  targetGrade: string
-  startDate: string
-  endDate: string
-  status: 'draft' | 'active' | 'completed'
-  subjects: string[]
-  responses: StudentResponse[]
+  name: string
+  grade: string
+  class: string
+  studentNumber: string
+  currentSpace?: string
+  checkInTime?: string
+  checkOutTime?: string
+  totalStudyTime: number
+  lastActivity: string
 }
 
-interface StudentResponse {
-  studentId: string
-  studentName: string
-  preferences: { subjectId: string; priority: number }[]
-  submitted: boolean
-  submittedAt?: string
+interface SpaceUsage {
+  spaceId: string
+  spaceName: string
+  currentStudents: Student[]
+  peakHours: { hour: number; count: number }[]
+  averageStayTime: number
+  utilizationRate: number
 }
 
-interface TimetableSlot {
+interface BeaconAlert {
   id: string
-  day: string
-  period: number
-  subject?: Subject
-  teacher?: Teacher
-  classroom?: Classroom
-  students: string[]
+  beaconId: string
+  type: 'low_battery' | 'offline' | 'signal_weak' | 'maintenance_due'
+  message: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  timestamp: string
+  resolved: boolean
 }
 
-export default function SubjectSurveyPage() {
-  const [currentStep, setCurrentStep] = useState<'master' | 'survey' | 'analysis' | 'timetable'>('master')
-  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null)
+export default function BeaconSpaceManagementPage() {
+  const [currentStep, setCurrentStep] = useState<'beacons' | 'spaces' | 'monitoring' | 'alerts'>('beacons')
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
   
-  // Master Data States
-  const [subjects, setSubjects] = useState<Subject[]>([
-    { id: '1', name: '고급수학', category: '수학', grade: '3', credits: 4, maxStudents: 30, description: '미적분과 통계' },
-    { id: '2', name: '영어독해', category: '영어', grade: '3', credits: 3, maxStudents: 25, description: '고급 독해 및 작문' },
-    { id: '3', name: '물리학실험', category: '과학', grade: '3', credits: 2, maxStudents: 20, description: '실험 중심 물리학' }
+  // Beacon System States
+  const [beacons, setBeacons] = useState<Beacon[]>([
+    { 
+      id: '1', 
+      uuid: '550e8400-e29b-41d4-a716-446655440001', 
+      major: 1001, 
+      minor: 1, 
+      name: '1정독실 입구 비콘', 
+      location: '1정독실 입구 천장', 
+      spaceId: '1', 
+      batteryLevel: 85, 
+      lastSignalTime: '2024-01-20 14:30:00', 
+      status: 'active', 
+      signalStrength: -45, 
+      installDate: '2024-01-01' 
+    },
+    { 
+      id: '2', 
+      uuid: '550e8400-e29b-41d4-a716-446655440002', 
+      major: 1002, 
+      minor: 1, 
+      name: '2정독실 입구 비콘', 
+      location: '2정독실 입구 천장', 
+      spaceId: '2', 
+      batteryLevel: 92, 
+      lastSignalTime: '2024-01-20 14:28:00', 
+      status: 'active', 
+      signalStrength: -42, 
+      installDate: '2024-01-01' 
+    },
+    { 
+      id: '3', 
+      uuid: '550e8400-e29b-41d4-a716-446655440003', 
+      major: 1003, 
+      minor: 1, 
+      name: '도서관 입구 비콘', 
+      location: '도서관 입구 벽면', 
+      spaceId: '3', 
+      batteryLevel: 15, 
+      lastSignalTime: '2024-01-20 13:45:00', 
+      status: 'low_battery', 
+      signalStrength: -65, 
+      installDate: '2024-01-01' 
+    }
   ])
   
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: '1', name: '김수학', subjects: ['1'], maxHours: 20, currentHours: 0 },
-    { id: '2', name: '이영어', subjects: ['2'], maxHours: 18, currentHours: 0 },
-    { id: '3', name: '박물리', subjects: ['3'], maxHours: 16, currentHours: 0 }
+  const [spaces, setSpaces] = useState<Space[]>([
+    { 
+      id: '1', 
+      name: '1정독실', 
+      type: '정독실', 
+      capacity: 50, 
+      currentOccupancy: 23, 
+      beaconId: '1', 
+      description: '조용한 개인 학습 공간', 
+      operatingHours: { start: '08:00', end: '22:00' }, 
+      rules: ['조용히 학습하기', '음식물 반입 금지', '휴대폰 무음 모드'] 
+    },
+    { 
+      id: '2', 
+      name: '2정독실', 
+      type: '정독실', 
+      capacity: 40, 
+      currentOccupancy: 18, 
+      beaconId: '2', 
+      description: '그룹 스터디 가능한 공간', 
+      operatingHours: { start: '08:00', end: '22:00' }, 
+      rules: ['적당한 소음 허용', '그룹 토론 가능', '정리정돈 필수'] 
+    },
+    { 
+      id: '3', 
+      name: '중앙도서관', 
+      type: '도서관', 
+      capacity: 100, 
+      currentOccupancy: 67, 
+      beaconId: '3', 
+      description: '종합 학습 및 자료 열람 공간', 
+      operatingHours: { start: '09:00', end: '21:00' }, 
+      rules: ['완전 무음', '도서 대출 규칙 준수', '개인 소지품 정리'] 
+    }
   ])
   
-  const [classrooms, setClassrooms] = useState<Classroom[]>([
-    { id: '1', name: '3-1교실', capacity: 30, type: '일반', equipment: ['칠판', '프로젝터'] },
-    { id: '2', name: '3-2교실', capacity: 25, type: '일반', equipment: ['칠판', '프로젝터'] },
-    { id: '3', name: '물리실험실', capacity: 20, type: '실험실', equipment: ['실험대', '기구', '안전장비'] }
+  const [students, setStudents] = useState<Student[]>([
+    { 
+      id: 's1', 
+      name: '김철수', 
+      grade: '3', 
+      class: '1', 
+      studentNumber: '2024001', 
+      currentSpace: '1', 
+      checkInTime: '2024-01-20 14:00:00', 
+      totalStudyTime: 120, 
+      lastActivity: '2024-01-20 14:30:00' 
+    },
+    { 
+      id: 's2', 
+      name: '이영희', 
+      grade: '3', 
+      class: '1', 
+      studentNumber: '2024002', 
+      currentSpace: '2', 
+      checkInTime: '2024-01-20 13:30:00', 
+      totalStudyTime: 90, 
+      lastActivity: '2024-01-20 14:25:00' 
+    },
+    { 
+      id: 's3', 
+      name: '박민수', 
+      grade: '3', 
+      class: '2', 
+      studentNumber: '2024003', 
+      currentSpace: '3', 
+      checkInTime: '2024-01-20 12:00:00', 
+      totalStudyTime: 150, 
+      lastActivity: '2024-01-20 14:20:00' 
+    }
   ])
 
-  // Survey States
-  const [surveys, setSurveys] = useState<Survey[]>([
+  // Additional States
+  const [alerts, setAlerts] = useState<BeaconAlert[]>([
     {
-      id: '1',
-      title: '2024학년도 2학기 3학년 과목 수요 조사',
-      targetGrade: '3',
-      startDate: '2024-01-15',
-      endDate: '2024-01-25',
-      status: 'active',
-      subjects: ['1', '2', '3'],
-      responses: [
-        {
-          studentId: 's1',
-          studentName: '김철수',
-          preferences: [
-            { subjectId: '1', priority: 1 },
-            { subjectId: '2', priority: 2 },
-            { subjectId: '3', priority: 3 }
-          ],
-          submitted: true,
-          submittedAt: '2024-01-20'
-        },
-        {
-          studentId: 's2',
-          studentName: '이영희',
-          preferences: [
-            { subjectId: '2', priority: 1 },
-            { subjectId: '1', priority: 2 },
-            { subjectId: '3', priority: 3 }
-          ],
-          submitted: true,
-          submittedAt: '2024-01-21'
-        }
-      ]
+      id: 'a1',
+      beaconId: '3',
+      type: 'low_battery',
+      message: '도서관 입구 비콘 배터리 잔량이 15%입니다. 교체가 필요합니다.',
+      severity: 'high',
+      timestamp: '2024-01-20 14:00:00',
+      resolved: false
+    },
+    {
+      id: 'a2',
+      beaconId: '1',
+      type: 'signal_weak',
+      message: '1정독실 비콘 신호가 약해졌습니다. 위치를 확인해주세요.',
+      severity: 'medium',
+      timestamp: '2024-01-20 13:30:00',
+      resolved: false
     }
   ])
 
-  const [newSubject, setNewSubject] = useState({
+  const [newBeacon, setNewBeacon] = useState({
+    uuid: '',
+    major: 0,
+    minor: 0,
     name: '',
-    category: '',
-    grade: '',
-    credits: 0,
-    maxStudents: 0,
-    description: ''
+    location: '',
+    spaceId: '',
+    installDate: ''
   })
 
-  const [newTeacher, setNewTeacher] = useState({
+  const [newSpace, setNewSpace] = useState({
     name: '',
-    subjects: [] as string[],
-    maxHours: 0
-  })
-
-  const [newClassroom, setNewClassroom] = useState({
-    name: '',
+    type: '정독실' as '정독실' | '도서관' | '컴퓨터실' | '실험실' | '강의실' | '휴게실',
     capacity: 0,
-    type: '일반' as '일반' | '특별실' | '실험실',
-    equipment: [] as string[]
+    description: '',
+    operatingHours: { start: '08:00', end: '22:00' },
+    rules: [] as string[]
   })
 
-  const [newSurvey, setNewSurvey] = useState({
-    title: '',
-    targetGrade: '',
-    startDate: '',
-    endDate: '',
-    subjects: [] as string[]
-  })
-
-  // Timetable States
-  const [timetable, setTimetable] = useState<TimetableSlot[]>([])
-  const [conflicts, setConflicts] = useState<string[]>([])
-
-  const addSubject = () => {
-    if (newSubject.name && newSubject.category) {
-      const subject: Subject = {
+  const addBeacon = () => {
+    if (newBeacon.name && newBeacon.uuid) {
+      const beacon: Beacon = {
         id: Date.now().toString(),
-        ...newSubject
+        ...newBeacon,
+        batteryLevel: 100,
+        lastSignalTime: new Date().toISOString(),
+        status: 'active',
+        signalStrength: -50
       }
-      setSubjects([...subjects, subject])
-      setNewSubject({ name: '', category: '', grade: '', credits: 0, maxStudents: 0, description: '' })
+      setBeacons([...beacons, beacon])
+      setNewBeacon({ uuid: '', major: 0, minor: 0, name: '', location: '', spaceId: '', installDate: '' })
     }
   }
 
-  const addTeacher = () => {
-    if (newTeacher.name) {
-      const teacher: Teacher = {
+  const addSpace = () => {
+    if (newSpace.name) {
+      const space: Space = {
         id: Date.now().toString(),
-        ...newTeacher,
-        currentHours: 0
+        ...newSpace,
+        currentOccupancy: 0
       }
-      setTeachers([...teachers, teacher])
-      setNewTeacher({ name: '', subjects: [], maxHours: 0 })
-    }
-  }
-
-  const addClassroom = () => {
-    if (newClassroom.name) {
-      const classroom: Classroom = {
-        id: Date.now().toString(),
-        ...newClassroom
-      }
-      setClassrooms([...classrooms, classroom])
-      setNewClassroom({ name: '', capacity: 0, type: '일반', equipment: [] })
-    }
-  }
-
-  const createSurvey = () => {
-    if (newSurvey.title && newSurvey.targetGrade) {
-      const survey: Survey = {
-        id: Date.now().toString(),
-        ...newSurvey,
-        status: 'draft',
-        responses: []
-      }
-      setSurveys([...surveys, survey])
-      setNewSurvey({ title: '', targetGrade: '', startDate: '', endDate: '', subjects: [] })
-    }
-  }
-
-  const getSubjectById = (id: string) => subjects.find(s => s.id === id)
-  const getTeacherById = (id: string) => teachers.find(t => t.id === id)
-  const getClassroomById = (id: string) => classrooms.find(c => c.id === id)
-
-  const getSurveyStats = (survey: Survey) => {
-    const totalStudents = survey.responses.length
-    const submittedStudents = survey.responses.filter(r => r.submitted).length
-    const subjectDemand = survey.subjects.map(subjectId => {
-      const subject = getSubjectById(subjectId)
-      const firstChoice = survey.responses.filter(r => 
-        r.submitted && r.preferences.some(p => p.subjectId === subjectId && p.priority === 1)
-      ).length
-      return {
-        subject,
-        firstChoice,
-        total: survey.responses.filter(r => 
-          r.submitted && r.preferences.some(p => p.subjectId === subjectId)
-        ).length
-      }
-    })
-    return { totalStudents, submittedStudents, subjectDemand }
-  }
-
-  const generateTimetable = () => {
-    // 간단한 시간표 생성 로직 (실제로는 더 복잡한 알고리즘 필요)
-    const days = ['월', '화', '수', '목', '금']
-    const periods = [1, 2, 3, 4, 5, 6, 7]
-    const newTimetable: TimetableSlot[] = []
-    
-    days.forEach(day => {
-      periods.forEach(period => {
-        newTimetable.push({
-          id: `${day}-${period}`,
-          day,
-          period,
-          students: []
-        })
+      setSpaces([...spaces, space])
+      setNewSpace({ 
+        name: '', 
+        type: '정독실', 
+        capacity: 0, 
+        description: '', 
+        operatingHours: { start: '08:00', end: '22:00' }, 
+        rules: [] 
       })
-    })
-    
-    setTimetable(newTimetable)
+    }
   }
 
-  const checkConflicts = () => {
-    const newConflicts: string[] = []
-    
-    // 교사 중복 체크
-    const teacherSlots: Record<string, string[]> = {}
-    timetable.forEach(slot => {
-      if (slot.teacher) {
-        const key = `${slot.day}-${slot.period}`
-        if (!teacherSlots[slot.teacher.id]) {
-          teacherSlots[slot.teacher.id] = []
-        }
-        teacherSlots[slot.teacher.id].push(key)
+  const getBeaconById = (id: string) => beacons.find(b => b.id === id)
+  const getSpaceById = (id: string) => spaces.find(s => s.id === id)
+  const getStudentById = (id: string) => students.find(s => s.id === id)
+
+  const getSpaceUsage = () => {
+    return spaces.map(space => {
+      const currentStudents = students.filter(s => s.currentSpace === space.id)
+      const utilizationRate = (space.currentOccupancy / space.capacity) * 100
+      
+      return {
+        spaceId: space.id,
+        spaceName: space.name,
+        currentStudents,
+        peakHours: [], // 실제로는 시간대별 데이터 필요
+        averageStayTime: 0, // 실제로는 계산 필요
+        utilizationRate
       }
     })
-    
-    Object.entries(teacherSlots).forEach(([teacherId, slots]) => {
-      if (slots.length > 1) {
-        const teacher = getTeacherById(teacherId)
-        newConflicts.push(`${teacher?.name} 교사가 동시에 여러 수업을 담당합니다: ${slots.join(', ')}`)
-      }
-    })
-    
-    setConflicts(newConflicts)
   }
 
-  // Master Data Management View
-  if (currentStep === 'master') {
+  const getBeaconStatus = () => {
+    const activeBeacons = beacons.filter(b => b.status === 'active').length
+    const lowBatteryBeacons = beacons.filter(b => b.status === 'low_battery').length
+    const offlineBeacons = beacons.filter(b => b.status === 'offline').length
+    
+    return {
+      total: beacons.length,
+      active: activeBeacons,
+      lowBattery: lowBatteryBeacons,
+      offline: offlineBeacons
+    }
+  }
+
+  const resolveAlert = (alertId: string) => {
+    setAlerts(alerts.map(alert => 
+      alert.id === alertId ? { ...alert, resolved: true } : alert
+    ))
+  }
+
+  // Beacon Management View
+  if (currentStep === 'beacons') {
+    const beaconStatus = getBeaconStatus()
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -295,414 +336,428 @@ export default function SubjectSurveyPage() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-godding-primary rounded-2xl flex items-center justify-center shadow-lg">
-                  <ChartBarIcon className="w-6 h-6 text-white" />
+                  <SignalIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-godding-text-primary">과목 수요 조사 관리</h1>
+                  <h1 className="text-4xl font-bold text-godding-text-primary">비콘 기반 공간 관리 시스템</h1>
                   <p className="text-lg text-godding-text-secondary mt-2">
-                    1단계: 기초 데이터 관리 - 과목, 교원, 강의실 정보 설정
+                    1단계: 비콘 등록 및 공간 매핑 - 하드웨어 설정 및 공간 연결
                   </p>
                 </div>
               </div>
               <div className="flex space-x-2">
                 <Button 
                   variant="outline"
-                  onClick={() => setCurrentStep('survey')}
+                  onClick={() => setCurrentStep('spaces')}
                 >
-                  다음 단계: 수요 조사 생성
+                  다음 단계: 공간 관리
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Subjects Management */}
+          {/* Beacon Status Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-              <CardHeader>
-                <CardTitle className="text-godding-text-primary flex items-center space-x-2">
-                  <BookOpenIcon className="w-5 h-5" />
-                  <span>과목 관리</span>
-                </CardTitle>
-                <CardDescription className="text-godding-text-secondary">
-                  개설 가능한 모든 과목 정보를 등록하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Input
-                    value={newSubject.name}
-                    onChange={(e) => setNewSubject(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="과목명"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={newSubject.category}
-                      onChange={(e) => setNewSubject(prev => ({ ...prev, category: e.target.value }))}
-                      placeholder="분야"
-                    />
-                    <Input
-                      value={newSubject.grade}
-                      onChange={(e) => setNewSubject(prev => ({ ...prev, grade: e.target.value }))}
-                      placeholder="학년"
-                    />
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">전체 비콘</p>
+                    <p className="text-2xl font-bold text-godding-text-primary">{beaconStatus.total}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      value={newSubject.credits}
-                      onChange={(e) => setNewSubject(prev => ({ ...prev, credits: parseInt(e.target.value) || 0 }))}
-                      placeholder="학점"
-                    />
-                    <Input
-                      type="number"
-                      value={newSubject.maxStudents}
-                      onChange={(e) => setNewSubject(prev => ({ ...prev, maxStudents: parseInt(e.target.value) || 0 }))}
-                      placeholder="정원"
-                    />
-                  </div>
-                  <Textarea
-                    value={newSubject.description}
-                    onChange={(e) => setNewSubject(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="과목 설명"
-                    rows={2}
-                  />
-                  <Button onClick={addSubject} className="w-full">
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    과목 추가
-                  </Button>
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {subjects.map((subject) => (
-                    <div key={subject.id} className="p-3 bg-white/50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium text-godding-text-primary">{subject.name}</h4>
-                          <p className="text-sm text-godding-text-secondary">
-                            {subject.category} | {subject.grade}학년 | {subject.credits}학점 | 정원 {subject.maxStudents}명
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                  <SignalIcon className="w-8 h-8 text-godding-primary" />
                 </div>
               </CardContent>
             </Card>
-
-            {/* Teachers Management */}
             <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-              <CardHeader>
-                <CardTitle className="text-godding-text-primary flex items-center space-x-2">
-                  <UserGroupIcon className="w-5 h-5" />
-                  <span>교원 관리</span>
-                </CardTitle>
-                <CardDescription className="text-godding-text-secondary">
-                  담당 가능 과목과 주당 시수를 설정하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Input
-                    value={newTeacher.name}
-                    onChange={(e) => setNewTeacher(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="교사명"
-                  />
-                  <Input
-                    type="number"
-                    value={newTeacher.maxHours}
-                    onChange={(e) => setNewTeacher(prev => ({ ...prev, maxHours: parseInt(e.target.value) || 0 }))}
-                    placeholder="주당 최대 시수"
-                  />
-                  <Button onClick={addTeacher} className="w-full">
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    교사 추가
-                  </Button>
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {teachers.map((teacher) => (
-                    <div key={teacher.id} className="p-3 bg-white/50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium text-godding-text-primary">{teacher.name}</h4>
-                          <p className="text-sm text-godding-text-secondary">
-                            최대 {teacher.maxHours}시수 | 현재 {teacher.currentHours}시수
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Classrooms Management */}
-            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-              <CardHeader>
-                <CardTitle className="text-godding-text-primary flex items-center space-x-2">
-                  <BuildingOfficeIcon className="w-5 h-5" />
-                  <span>강의실 관리</span>
-                </CardTitle>
-                <CardDescription className="text-godding-text-secondary">
-                  수용 인원과 특별실 여부를 설정하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Input
-                    value={newClassroom.name}
-                    onChange={(e) => setNewClassroom(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="강의실명"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      value={newClassroom.capacity}
-                      onChange={(e) => setNewClassroom(prev => ({ ...prev, capacity: parseInt(e.target.value) || 0 }))}
-                      placeholder="수용 인원"
-                    />
-                    <select
-                      value={newClassroom.type}
-                      onChange={(e) => setNewClassroom(prev => ({ ...prev, type: e.target.value as any }))}
-                      className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                    >
-                      <option value="일반">일반</option>
-                      <option value="특별실">특별실</option>
-                      <option value="실험실">실험실</option>
-                    </select>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">정상 작동</p>
+                    <p className="text-2xl font-bold text-green-600">{beaconStatus.active}</p>
                   </div>
-                  <Button onClick={addClassroom} className="w-full">
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    강의실 추가
-                  </Button>
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {classrooms.map((classroom) => (
-                    <div key={classroom.id} className="p-3 bg-white/50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium text-godding-text-primary">{classroom.name}</h4>
-                          <p className="text-sm text-godding-text-secondary">
-                            {classroom.type} | 수용 {classroom.capacity}명
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                  <CheckCircleIcon className="w-8 h-8 text-green-500" />
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Survey Creation View
-  if (currentStep === 'survey') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setCurrentStep('master')}
-                  className="flex items-center space-x-2"
-                >
-                  ← 이전 단계
-                </Button>
-                <div className="w-12 h-12 bg-godding-primary rounded-2xl flex items-center justify-center shadow-lg">
-                  <CalendarDaysIcon className="w-6 h-6 text-white" />
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">배터리 부족</p>
+                    <p className="text-2xl font-bold text-yellow-600">{beaconStatus.lowBattery}</p>
+                  </div>
+                  <Battery0Icon className="w-8 h-8 text-yellow-500" />
                 </div>
-                <div>
-                  <h1 className="text-4xl font-bold text-godding-text-primary">수요 조사 생성</h1>
-                  <p className="text-lg text-godding-text-secondary mt-2">
-                    2단계: 수요 조사 생성 및 게시
-                  </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">오프라인</p>
+                    <p className="text-2xl font-bold text-red-600">{beaconStatus.offline}</p>
+                  </div>
+                  <XCircleIcon className="w-8 h-8 text-red-500" />
                 </div>
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => setCurrentStep('analysis')}
-                >
-                  다음 단계: 결과 분석
-                </Button>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Create New Survey */}
+            {/* Beacon Registration */}
             <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
               <CardHeader>
-                <CardTitle className="text-godding-text-primary">새 수요 조사 생성</CardTitle>
+                <CardTitle className="text-godding-text-primary flex items-center space-x-2">
+                  <SignalIcon className="w-5 h-5" />
+                  <span>비콘 등록</span>
+                </CardTitle>
                 <CardDescription className="text-godding-text-secondary">
-                  특정 학년을 대상으로 수요 조사를 생성하세요
+                  새로운 비콘 하드웨어를 시스템에 등록하세요
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-godding-text-primary mb-1">
-                    조사 제목
-                  </label>
+                <div className="space-y-3">
                   <Input
-                    value={newSurvey.title}
-                    onChange={(e) => setNewSurvey(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="예: 2024학년도 2학기 3학년 과목 수요 조사"
+                    value={newBeacon.name}
+                    onChange={(e) => setNewBeacon(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="비콘 이름 (예: 1정독실 입구 비콘)"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-godding-text-primary mb-1">
-                    대상 학년
-                  </label>
                   <Input
-                    value={newSurvey.targetGrade}
-                    onChange={(e) => setNewSurvey(prev => ({ ...prev, targetGrade: e.target.value }))}
-                    placeholder="예: 3학년"
+                    value={newBeacon.uuid}
+                    onChange={(e) => setNewBeacon(prev => ({ ...prev, uuid: e.target.value }))}
+                    placeholder="UUID (예: 550e8400-e29b-41d4-a716-446655440001)"
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-godding-text-primary mb-1">
-                      조사 시작일
-                    </label>
+                  <div className="grid grid-cols-2 gap-2">
                     <Input
-                      type="date"
-                      value={newSurvey.startDate}
-                      onChange={(e) => setNewSurvey(prev => ({ ...prev, startDate: e.target.value }))}
+                      type="number"
+                      value={newBeacon.major}
+                      onChange={(e) => setNewBeacon(prev => ({ ...prev, major: parseInt(e.target.value) || 0 }))}
+                      placeholder="Major ID"
+                    />
+                    <Input
+                      type="number"
+                      value={newBeacon.minor}
+                      onChange={(e) => setNewBeacon(prev => ({ ...prev, minor: parseInt(e.target.value) || 0 }))}
+                      placeholder="Minor ID"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-godding-text-primary mb-1">
-                      조사 종료일
-                    </label>
-                    <Input
-                      type="date"
-                      value={newSurvey.endDate}
-                      onChange={(e) => setNewSurvey(prev => ({ ...prev, endDate: e.target.value }))}
-                    />
-                  </div>
+                  <Input
+                    value={newBeacon.location}
+                    onChange={(e) => setNewBeacon(prev => ({ ...prev, location: e.target.value }))}
+                    placeholder="설치 위치 (예: 1정독실 입구 천장)"
+                  />
+                  <Input
+                    type="date"
+                    value={newBeacon.installDate}
+                    onChange={(e) => setNewBeacon(prev => ({ ...prev, installDate: e.target.value }))}
+                    placeholder="설치 날짜"
+                  />
+                  <Button onClick={addBeacon} className="w-full">
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    비콘 등록
+                  </Button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-godding-text-primary mb-1">
-                    선택 과목
-                  </label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {subjects.map((subject) => (
-                      <label key={subject.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={newSurvey.subjects.includes(subject.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewSurvey(prev => ({ ...prev, subjects: [...prev.subjects, subject.id] }))
-                            } else {
-                              setNewSurvey(prev => ({ ...prev, subjects: prev.subjects.filter(id => id !== subject.id) }))
-                            }
-                          }}
-                        />
-                        <span className="text-sm text-godding-text-secondary">
-                          {subject.name} ({subject.category}, {subject.credits}학점)
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <Button onClick={createSurvey} className="w-full">
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  수요 조사 생성
-                </Button>
               </CardContent>
             </Card>
 
-            {/* Existing Surveys */}
+            {/* Space Mapping */}
             <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
               <CardHeader>
-                <CardTitle className="text-godding-text-primary">기존 수요 조사</CardTitle>
+                <CardTitle className="text-godding-text-primary flex items-center space-x-2">
+                  <MapPinIcon className="w-5 h-5" />
+                  <span>공간 매핑</span>
+                </CardTitle>
                 <CardDescription className="text-godding-text-secondary">
-                  생성된 수요 조사 목록입니다
+                  비콘을 특정 공간과 연결하세요
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  {surveys.map((survey) => {
-                    const stats = getSurveyStats(survey)
-                    return (
-                      <div key={survey.id} className="p-4 bg-white/50 rounded-lg">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-medium text-godding-text-primary">{survey.title}</h4>
-                            <p className="text-sm text-godding-text-secondary">
-                              대상: {survey.targetGrade} | 기간: {survey.startDate} ~ {survey.endDate}
-                            </p>
-                          </div>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            survey.status === 'active' ? 'bg-green-100 text-green-700' :
-                            survey.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-blue-100 text-blue-700'
-                          }`}>
-                            {survey.status === 'active' ? '진행중' : 
-                             survey.status === 'draft' ? '임시저장' : '완료'}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-godding-text-secondary">
-                            {stats.submittedStudents} / {stats.totalStudents} 응답
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedSurvey(survey)
-                                setCurrentStep('analysis')
-                              }}
-                            >
-                              <EyeIcon className="w-4 h-4 mr-1" />
-                              분석
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedSurvey(survey)
-                                setCurrentStep('timetable')
-                              }}
-                            >
-                              <CalendarDaysIcon className="w-4 h-4 mr-1" />
-                              시간표
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  <Input
+                    value={newSpace.name}
+                    onChange={(e) => setNewSpace(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="공간 이름 (예: 1정독실)"
+                  />
+                  <select
+                    value={newSpace.type}
+                    onChange={(e) => setNewSpace(prev => ({ ...prev, type: e.target.value as any }))}
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="정독실">정독실</option>
+                    <option value="도서관">도서관</option>
+                    <option value="컴퓨터실">컴퓨터실</option>
+                    <option value="실험실">실험실</option>
+                    <option value="강의실">강의실</option>
+                    <option value="휴게실">휴게실</option>
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      value={newSpace.capacity}
+                      onChange={(e) => setNewSpace(prev => ({ ...prev, capacity: parseInt(e.target.value) || 0 }))}
+                      placeholder="수용 인원"
+                    />
+                    <select className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                      <option>비콘 선택</option>
+                      {beacons.map((beacon) => (
+                        <option key={beacon.id} value={beacon.id}>
+                          {beacon.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Textarea
+                    value={newSpace.description}
+                    onChange={(e) => setNewSpace(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="공간 설명"
+                    rows={2}
+                  />
+                  <Button onClick={addSpace} className="w-full">
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    공간 등록
+                  </Button>
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Registered Beacons */}
+          <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border mt-8">
+            <CardHeader>
+              <CardTitle className="text-godding-text-primary">등록된 비콘 목록</CardTitle>
+              <CardDescription className="text-godding-text-secondary">
+                시스템에 등록된 모든 비콘의 상태를 확인하세요
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {beacons.map((beacon) => {
+                  const space = getSpaceById(beacon.spaceId)
+                  return (
+                    <div key={beacon.id} className="p-4 bg-white/50 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h4 className="font-medium text-godding-text-primary">{beacon.name}</h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              beacon.status === 'active' ? 'bg-green-100 text-green-700' :
+                              beacon.status === 'low_battery' ? 'bg-yellow-100 text-yellow-700' :
+                              beacon.status === 'offline' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {beacon.status === 'active' ? '정상' :
+                               beacon.status === 'low_battery' ? '배터리 부족' :
+                               beacon.status === 'offline' ? '오프라인' : '점검중'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm text-godding-text-secondary">
+                            <div>
+                              <p><strong>위치:</strong> {beacon.location}</p>
+                              <p><strong>연결된 공간:</strong> {space?.name || '미연결'}</p>
+                            </div>
+                            <div>
+                              <p><strong>배터리:</strong> {beacon.batteryLevel}%</p>
+                              <p><strong>신호 강도:</strong> {beacon.signalStrength} dBm</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-xs text-godding-text-secondary">
+                            <p>UUID: {beacon.uuid}</p>
+                            <p>Major: {beacon.major}, Minor: {beacon.minor}</p>
+                            <p>마지막 신호: {beacon.lastSignalTime}</p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm">
+                            <PencilIcon className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Space Management View
+  if (currentStep === 'spaces') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCurrentStep('beacons')}
+                  className="flex items-center space-x-2"
+                >
+                  ← 이전 단계
+                </Button>
+                <div className="w-12 h-12 bg-godding-primary rounded-2xl flex items-center justify-center shadow-lg">
+                  <BuildingOfficeIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-godding-text-primary">공간 관리</h1>
+                  <p className="text-lg text-godding-text-secondary mt-2">
+                    2단계: 학습 공간 설정 및 운영 규칙 관리
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setCurrentStep('monitoring')}
+                >
+                  다음 단계: 실시간 모니터링
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Space Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">전체 공간</p>
+                    <p className="text-2xl font-bold text-godding-text-primary">{spaces.length}</p>
+                  </div>
+                  <BuildingOfficeIcon className="w-8 h-8 text-godding-primary" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">현재 이용자</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {spaces.reduce((sum, space) => sum + space.currentOccupancy, 0)}
+                    </p>
+                  </div>
+                  <UserGroupIcon className="w-8 h-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">전체 수용 인원</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {spaces.reduce((sum, space) => sum + space.capacity, 0)}
+                    </p>
+                  </div>
+                  <UserGroupIcon className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Spaces List */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {spaces.map((space) => {
+              const beacon = getBeaconById(space.beaconId || '')
+              const utilizationRate = (space.currentOccupancy / space.capacity) * 100
+              
+              return (
+                <Card key={space.id} className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-godding-text-primary">{space.name}</CardTitle>
+                        <CardDescription className="text-godding-text-secondary">
+                          {space.type} | {space.description}
+                        </CardDescription>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        utilizationRate > 80 ? 'bg-red-100 text-red-700' :
+                        utilizationRate > 60 ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        {utilizationRate.toFixed(0)}% 이용률
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-godding-text-secondary">현재 이용자</p>
+                        <p className="text-lg font-bold text-godding-text-primary">
+                          {space.currentOccupancy} / {space.capacity}명
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-godding-text-secondary">운영 시간</p>
+                        <p className="text-sm text-godding-text-primary">
+                          {space.operatingHours.start} - {space.operatingHours.end}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {beacon && (
+                      <div className="p-3 bg-white/50 rounded-lg">
+                        <p className="text-sm font-medium text-godding-text-secondary mb-1">연결된 비콘</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-godding-text-primary">{beacon.name}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            beacon.status === 'active' ? 'bg-green-100 text-green-700' :
+                            beacon.status === 'low_battery' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {beacon.status === 'active' ? '정상' :
+                             beacon.status === 'low_battery' ? '배터리 부족' : '오프라인'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <p className="text-sm font-medium text-godding-text-secondary mb-2">운영 규칙</p>
+                      <div className="space-y-1">
+                        {space.rules.map((rule, index) => (
+                          <div key={index} className="text-xs text-godding-text-secondary flex items-center">
+                            <CheckCircleIcon className="w-3 h-3 mr-1 text-green-500" />
+                            {rule}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <EyeIcon className="w-4 h-4 mr-1" />
+                        상세보기
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <PencilIcon className="w-4 h-4 mr-1" />
+                        수정
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </div>
     )
   }
 
-  // Analysis Dashboard View
-  if (currentStep === 'analysis' && selectedSurvey) {
-    const stats = getSurveyStats(selectedSurvey)
+  // Real-time Monitoring View
+  if (currentStep === 'monitoring') {
+    const spaceUsage = getSpaceUsage()
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
@@ -713,112 +768,212 @@ export default function SubjectSurveyPage() {
               <div className="flex items-center space-x-4">
                 <Button 
                   variant="outline" 
-                  onClick={() => setCurrentStep('survey')}
+                  onClick={() => setCurrentStep('spaces')}
                   className="flex items-center space-x-2"
                 >
                   ← 이전 단계
                 </Button>
                 <div className="w-12 h-12 bg-godding-primary rounded-2xl flex items-center justify-center shadow-lg">
-                  <ChartBarIcon className="w-6 h-6 text-white" />
+                  <EyeIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-godding-text-primary">수요 조사 결과 분석</h1>
+                  <h1 className="text-4xl font-bold text-godding-text-primary">실시간 모니터링</h1>
                   <p className="text-lg text-godding-text-secondary mt-2">
-                    {selectedSurvey.title}
+                    3단계: 실시간 공간 현황 및 학생 활동 모니터링
                   </p>
                 </div>
               </div>
               <div className="flex space-x-2">
                 <Button 
-                  onClick={() => setCurrentStep('timetable')}
+                  variant="outline"
+                  onClick={() => setCurrentStep('alerts')}
                 >
-                  시간표 편성으로
+                  다음 단계: 알림 관리
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Summary Stats */}
-            <div className="lg:col-span-1 space-y-4">
-              <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-                <CardHeader>
-                  <CardTitle className="text-godding-text-primary">응답 현황</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{stats.totalStudents}</div>
-                    <div className="text-sm text-godding-text-secondary">전체 학생</div>
+          {/* Real-time Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">현재 이용자</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {students.filter(s => s.currentSpace).length}
+                    </p>
                   </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{stats.submittedStudents}</div>
-                    <div className="text-sm text-godding-text-secondary">응답 완료</div>
+                  <UserGroupIcon className="w-8 h-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">활성 공간</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {spaces.filter(s => s.currentOccupancy > 0).length}
+                    </p>
                   </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{stats.totalStudents - stats.submittedStudents}</div>
-                    <div className="text-sm text-godding-text-secondary">미응답</div>
+                  <BuildingOfficeIcon className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">평균 이용률</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {Math.round(spaceUsage.reduce((sum, usage) => sum + usage.utilizationRate, 0) / spaceUsage.length)}%
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <ClockIcon className="w-8 h-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">정상 비콘</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {beacons.filter(b => b.status === 'active').length}
+                    </p>
+                  </div>
+                  <SignalIcon className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            {/* Subject Demand Analysis */}
-            <div className="lg:col-span-3">
-              <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-                <CardHeader>
-                  <CardTitle className="text-godding-text-primary">과목별 수요 분석</CardTitle>
-                  <CardDescription className="text-godding-text-secondary">
-                    과목별 신청 인원과 1순위 선택 비율을 확인하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {stats.subjectDemand.map(({ subject, firstChoice, total }) => (
-                      <div key={subject?.id} className="p-4 bg-white/50 rounded-lg">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-medium text-godding-text-primary">{subject?.name}</h4>
-                            <p className="text-sm text-godding-text-secondary">
-                              {subject?.category} | {subject?.credits}학점 | 정원 {subject?.maxStudents}명
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-godding-text-primary">{total}명</div>
-                            <div className="text-sm text-godding-text-secondary">신청</div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-godding-text-secondary">1순위 선택</span>
-                            <span className="font-medium text-godding-text-primary">{firstChoice}명</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-godding-primary h-2 rounded-full" 
-                              style={{ width: `${(firstChoice / total) * 100}%` }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-godding-text-secondary">정원 대비</span>
-                            <span className={`font-medium ${total > (subject?.maxStudents || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                              {total} / {subject?.maxStudents}명
+          {/* Current Students */}
+          <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border mb-8">
+            <CardHeader>
+              <CardTitle className="text-godding-text-primary">현재 이용 중인 학생</CardTitle>
+              <CardDescription className="text-godding-text-secondary">
+                실시간으로 공간을 이용하고 있는 학생들의 현황입니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {students.filter(s => s.currentSpace).map((student) => {
+                  const space = getSpaceById(student.currentSpace || '')
+                  const checkInTime = new Date(student.checkInTime || '')
+                  const currentTime = new Date()
+                  const studyTime = Math.floor((currentTime.getTime() - checkInTime.getTime()) / (1000 * 60))
+                  
+                  return (
+                    <div key={student.id} className="p-4 bg-white/50 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h4 className="font-medium text-godding-text-primary">{student.name}</h4>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              {student.grade}-{student.class}
+                            </span>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              {space?.name}
                             </span>
                           </div>
+                          <div className="grid grid-cols-3 gap-4 text-sm text-godding-text-secondary">
+                            <div>
+                              <p><strong>학번:</strong> {student.studentNumber}</p>
+                              <p><strong>입실 시간:</strong> {student.checkInTime}</p>
+                            </div>
+                            <div>
+                              <p><strong>현재 공간:</strong> {space?.name}</p>
+                              <p><strong>이용 시간:</strong> {studyTime}분</p>
+                            </div>
+                            <div>
+                              <p><strong>총 학습 시간:</strong> {student.totalStudyTime}분</p>
+                              <p><strong>마지막 활동:</strong> {student.lastActivity}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm">
+                            <EyeIcon className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Space Utilization */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {spaceUsage.map((usage) => {
+              const space = getSpaceById(usage.spaceId)
+              return (
+                <Card key={usage.spaceId} className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+                  <CardHeader>
+                    <CardTitle className="text-godding-text-primary">{usage.spaceName}</CardTitle>
+                    <CardDescription className="text-godding-text-secondary">
+                      실시간 이용 현황 및 통계
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-godding-text-secondary">이용률</span>
+                      <span className="text-lg font-bold text-godding-text-primary">
+                        {usage.utilizationRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          usage.utilizationRate > 80 ? 'bg-red-500' :
+                          usage.utilizationRate > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(usage.utilizationRate, 100)}%` }}
+                      ></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-godding-text-secondary">현재 이용자</p>
+                        <p className="font-bold text-godding-text-primary">{usage.currentStudents.length}명</p>
+                      </div>
+                      <div>
+                        <p className="text-godding-text-secondary">수용 인원</p>
+                        <p className="font-bold text-godding-text-primary">{space?.capacity}명</p>
+                      </div>
+                    </div>
+                    
+                    {usage.currentStudents.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-godding-text-secondary mb-2">현재 이용자 목록</p>
+                        <div className="space-y-1">
+                          {usage.currentStudents.map((student) => (
+                            <div key={student.id} className="text-xs text-godding-text-secondary flex items-center justify-between">
+                              <span>{student.name} ({student.grade}-{student.class})</span>
+                              <span className="text-godding-text-primary">
+                                {Math.floor((new Date().getTime() - new Date(student.checkInTime || '').getTime()) / (1000 * 60))}분
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </div>
     )
   }
 
-  // Timetable Simulator View
-  if (currentStep === 'timetable' && selectedSurvey) {
+  // Alerts Management View
+  if (currentStep === 'alerts') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -828,156 +983,267 @@ export default function SubjectSurveyPage() {
               <div className="flex items-center space-x-4">
                 <Button 
                   variant="outline" 
-                  onClick={() => setCurrentStep('analysis')}
+                  onClick={() => setCurrentStep('monitoring')}
                   className="flex items-center space-x-2"
                 >
                   ← 이전 단계
                 </Button>
                 <div className="w-12 h-12 bg-godding-primary rounded-2xl flex items-center justify-center shadow-lg">
-                  <CalendarDaysIcon className="w-6 h-6 text-white" />
+                  <BellIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-godding-text-primary">시간표 편성 시뮬레이터</h1>
+                  <h1 className="text-4xl font-bold text-godding-text-primary">알림 관리</h1>
                   <p className="text-lg text-godding-text-secondary mt-2">
-                    {selectedSurvey.title} - 시간표 편성 및 충돌 검사
+                    4단계: 비콘 하드웨어 원격 모니터링 및 알림 관리
                   </p>
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <Button onClick={generateTimetable}>
-                  <ArrowPathIcon className="w-4 h-4 mr-2" />
-                  시간표 생성
-                </Button>
-                <Button variant="outline" onClick={checkConflicts}>
-                  <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
-                  충돌 검사
-                </Button>
-              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Conflicts Panel */}
-            <div className="lg:col-span-1 space-y-4">
-              <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-                <CardHeader>
-                  <CardTitle className="text-godding-text-primary flex items-center space-x-2">
-                    <ExclamationTriangleIcon className="w-5 h-5" />
-                    <span>충돌 알림</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {conflicts.length > 0 ? (
-                    <div className="space-y-2">
-                      {conflicts.map((conflict, index) => (
-                        <div key={index} className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                          {conflict}
+          {/* Alert Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">전체 알림</p>
+                    <p className="text-2xl font-bold text-godding-text-primary">{alerts.length}</p>
+                  </div>
+                  <BellIcon className="w-8 h-8 text-godding-primary" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">미해결</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {alerts.filter(a => !a.resolved).length}
+                    </p>
+                  </div>
+                  <ExclamationTriangleIcon className="w-8 h-8 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">높은 우선순위</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {alerts.filter(a => a.severity === 'high' || a.severity === 'critical').length}
+                    </p>
+                  </div>
+                  <ExclamationTriangleIcon className="w-8 h-8 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-godding-text-secondary">해결됨</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {alerts.filter(a => a.resolved).length}
+                    </p>
+                  </div>
+                  <CheckCircleIcon className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Active Alerts */}
+          <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border mb-8">
+            <CardHeader>
+              <CardTitle className="text-godding-text-primary">활성 알림</CardTitle>
+              <CardDescription className="text-godding-text-secondary">
+                즉시 처리해야 할 비콘 관련 알림들입니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {alerts.filter(a => !a.resolved).map((alert) => {
+                  const beacon = getBeaconById(alert.beaconId)
+                  return (
+                    <div key={alert.id} className={`p-4 rounded-lg border-l-4 ${
+                      alert.severity === 'critical' ? 'bg-red-50 border-red-500' :
+                      alert.severity === 'high' ? 'bg-orange-50 border-orange-500' :
+                      alert.severity === 'medium' ? 'bg-yellow-50 border-yellow-500' :
+                      'bg-blue-50 border-blue-500'
+                    }`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h4 className="font-medium text-godding-text-primary">{alert.message}</h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              alert.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                              alert.severity === 'high' ? 'bg-orange-100 text-orange-700' :
+                              alert.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {alert.severity === 'critical' ? '긴급' :
+                               alert.severity === 'high' ? '높음' :
+                               alert.severity === 'medium' ? '보통' : '낮음'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-godding-text-secondary">
+                            <p><strong>관련 비콘:</strong> {beacon?.name}</p>
+                            <p><strong>발생 시간:</strong> {alert.timestamp}</p>
+                            <p><strong>알림 유형:</strong> {
+                              alert.type === 'low_battery' ? '배터리 부족' :
+                              alert.type === 'offline' ? '오프라인' :
+                              alert.type === 'signal_weak' ? '신호 약함' : '점검 필요'
+                            }</p>
+                          </div>
                         </div>
-                      ))}
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => resolveAlert(alert.id)}
+                          >
+                            <CheckCircleIcon className="w-4 h-4 mr-1" />
+                            해결
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <EyeIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-center p-4 text-godding-text-secondary">
-                      <CheckCircleIcon className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                      <p>충돌이 없습니다</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-                <CardHeader>
-                  <CardTitle className="text-godding-text-primary">미편성 현황</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="text-sm text-godding-text-secondary">
-                      미배정 과목: {selectedSurvey.subjects.length}개
+          {/* Student App Simulation */}
+          <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
+            <CardHeader>
+              <CardTitle className="text-godding-text-primary flex items-center space-x-2">
+                <DevicePhoneMobileIcon className="w-5 h-5" />
+                <span>학생용 앱 '고딩픽' 시뮬레이션</span>
+              </CardTitle>
+              <CardDescription className="text-godding-text-secondary">
+                비콘 감지 시 학생이 경험하게 될 자동화된 상호작용을 시뮬레이션합니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* App Flow Steps */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-white/50 rounded-lg">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-blue-600">1</span>
+                      </div>
+                      <h4 className="font-medium text-godding-text-primary">자동 감지</h4>
                     </div>
-                    <div className="text-sm text-godding-text-secondary">
-                      미배정 교사: {teachers.length}명
-                    </div>
-                    <div className="text-sm text-godding-text-secondary">
-                      미배정 강의실: {classrooms.length}개
-                    </div>
+                    <p className="text-sm text-godding-text-secondary">
+                      학생이 비콘 범위에 접근하면 앱이 자동으로 BLE 신호를 감지합니다.
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  
+                  <div className="p-4 bg-white/50 rounded-lg">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-green-600">2</span>
+                      </div>
+                      <h4 className="font-medium text-godding-text-primary">상황인지 알림</h4>
+                    </div>
+                    <p className="text-sm text-godding-text-secondary">
+                      "1정독실 근처에 계시네요. 입실할까요?" 푸시 알림이 표시됩니다.
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-white/50 rounded-lg">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-purple-600">3</span>
+                      </div>
+                      <h4 className="font-medium text-godding-text-primary">원탭 체크인</h4>
+                    </div>
+                    <p className="text-sm text-godding-text-secondary">
+                      학생이 '입실하기' 버튼을 한 번만 눌러 입실 처리를 완료합니다.
+                    </p>
+                  </div>
+                </div>
 
-            {/* Timetable Grid */}
-            <div className="lg:col-span-3">
-              <Card className="bg-godding-card-bg backdrop-blur-sm border-godding-card-border">
-                <CardHeader>
-                  <CardTitle className="text-godding-text-primary">시간표 그리드</CardTitle>
-                  <CardDescription className="text-godding-text-secondary">
-                    드래그 앤 드롭으로 과목을 배치하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-300 p-2 bg-gray-50 text-godding-text-primary">시간</th>
-                          {['월', '화', '수', '목', '금'].map(day => (
-                            <th key={day} className="border border-gray-300 p-2 bg-gray-50 text-godding-text-primary">
-                              {day}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[1, 2, 3, 4, 5, 6, 7].map(period => (
-                          <tr key={period}>
-                            <td className="border border-gray-300 p-2 bg-gray-50 text-godding-text-primary font-medium">
-                              {period}교시
-                            </td>
-                            {['월', '화', '수', '목', '금'].map(day => {
-                              const slot = timetable.find(s => s.day === day && s.period === period)
-                              return (
-                                <td key={`${day}-${period}`} className="border border-gray-300 p-2 min-w-[120px] h-16 bg-white hover:bg-gray-50 cursor-pointer">
-                                  {slot?.subject ? (
-                                    <div className="p-2 bg-godding-primary text-white rounded text-xs">
-                                      <div className="font-medium">{slot.subject.name}</div>
-                                      <div className="text-xs opacity-80">
-                                        {slot.teacher?.name} | {slot.classroom?.name}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-gray-400 text-xs">빈 시간</div>
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {/* Grace Period Explanation */}
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <ClockIcon className="w-5 h-5 text-yellow-600" />
+                    <h4 className="font-medium text-yellow-800">Grace Period (유예 시간)</h4>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                  <p className="text-sm text-yellow-700">
+                    학생이 비콘 신호 범위에서 벗어났을 때 바로 퇴실 처리하는 것이 아니라, 
+                    3-5분의 유예 시간을 두어 일시적인 신호 유실로 인한 오퇴실을 방지합니다.
+                  </p>
+                </div>
+
+                {/* Demo Buttons */}
+                <div className="flex space-x-4">
+                  <Button className="flex items-center space-x-2">
+                    <SignalIcon className="w-4 h-4" />
+                    <span>비콘 감지 시뮬레이션</span>
+                  </Button>
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <BellIcon className="w-4 h-4" />
+                    <span>푸시 알림 테스트</span>
+                  </Button>
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <DevicePhoneMobileIcon className="w-4 h-4" />
+                    <span>앱 UI 미리보기</span>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
-  // Default view - redirect to master data
+  // Default view - redirect to beacons
   return (
     <div className="min-h-screen bg-gradient-to-br from-godding-bg-primary to-godding-bg-secondary py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="w-20 h-20 bg-godding-primary rounded-3xl flex items-center justify-center mx-auto mb-6">
-          <ChartBarIcon className="w-10 h-10 text-white" />
+          <SignalIcon className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-4xl font-bold text-godding-text-primary mb-4">
-          과목 수요 조사 관리
+          비콘 기반 공간 관리 시스템
         </h1>
         <p className="text-xl text-godding-text-secondary mb-8">
-          3단계 프로세스로 체계적인 과목 수요 조사와 시간표 편성을 진행하세요
+          4단계 프로세스로 체계적인 비콘 기반 공간 관리를 진행하세요
         </p>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="p-4 bg-white/50 rounded-lg">
+            <SignalIcon className="w-8 h-8 text-godding-primary mx-auto mb-2" />
+            <h3 className="font-medium text-godding-text-primary">1. 비콘 등록</h3>
+            <p className="text-sm text-godding-text-secondary">하드웨어 설정 및 공간 연결</p>
+          </div>
+          <div className="p-4 bg-white/50 rounded-lg">
+            <BuildingOfficeIcon className="w-8 h-8 text-godding-primary mx-auto mb-2" />
+            <h3 className="font-medium text-godding-text-primary">2. 공간 관리</h3>
+            <p className="text-sm text-godding-text-secondary">학습 공간 설정 및 운영 규칙</p>
+          </div>
+          <div className="p-4 bg-white/50 rounded-lg">
+            <EyeIcon className="w-8 h-8 text-godding-primary mx-auto mb-2" />
+            <h3 className="font-medium text-godding-text-primary">3. 실시간 모니터링</h3>
+            <p className="text-sm text-godding-text-secondary">현황 및 학생 활동 추적</p>
+          </div>
+          <div className="p-4 bg-white/50 rounded-lg">
+            <BellIcon className="w-8 h-8 text-godding-primary mx-auto mb-2" />
+            <h3 className="font-medium text-godding-text-primary">4. 알림 관리</h3>
+            <p className="text-sm text-godding-text-secondary">비콘 상태 모니터링 및 알림</p>
+          </div>
+        </div>
         <Button 
-          onClick={() => setCurrentStep('master')}
+          onClick={() => setCurrentStep('beacons')}
           size="lg"
           className="text-lg px-8 py-4"
         >
